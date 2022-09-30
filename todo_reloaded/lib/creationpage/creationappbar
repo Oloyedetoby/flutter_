@@ -1,0 +1,37 @@
+import 'package:flutter/material.dart';
+import '../provider/note_provider.dart';
+
+AppBar createappBar(
+  NoteProvider noteprovi,
+  BuildContext context,
+  TextEditingController mynotetextcontroller,
+  TextEditingController mynotetitlecontroller,
+  String tittle,
+  String notte,
+  FocusNode myTextFocusNode,
+  FocusNode myTittleFocusNode,
+) {
+  return AppBar(
+    backgroundColor: Colors.transparent,
+    title: Text(tittle),
+    centerTitle: true,
+    elevation: 0,
+    actions: [if (myTextFocusNode.hasFocus)...[
+      Text('j ${myTextFocusNode.hasFocus}'),
+    ]else...[Text('${myTittleFocusNode.hasFocus}'),]
+      
+      
+    ],
+  );
+}
+
+createappBar(
+        widget.noteprovi!,
+        context,
+        _mynotetextcontroller,
+        _mynotetitlecontroller,
+        widget.tittle,
+        widget.notte,
+        _myTextFocusNode,
+        _myTittleFocusNode,
+      ),
