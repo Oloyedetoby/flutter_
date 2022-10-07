@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:html';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -33,6 +33,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+//event
 @immutable
 abstract class LoadAction {
   const LoadAction();
@@ -78,13 +79,17 @@ class Person {
   String toString() => 'Person ( name = $name, age= $age)';
 }
 
+//to download the json from the server
 Future<Iterable<Person>> getPersons(String url) => HttpClient()
-    .getUrl(Uri.parse(url))
-    .then((req) => req.close())
-    .then((resp) => resp.transform(utf8.decoder).join())
-    .then((str) => json.decode(str) as List<dynamic>)
-    .then((list) => list.map((e) => Person.fromjson(e)));
+    .getUrl(Uri.parse(url)) // this ask a request request
+    .then((req) => req.close()) // this gives a respond
+    .then((resp) => resp.transform(utf8.decoder).join()) // responnd to string
+    .then((str) =>
+        json.decode(str) as List<dynamic>) // tring goes into to become a  list
+    .then((list) => list.map((e) => Person.fromjson(
+        e))); // the ist becomes iterable of person and the result is future
 
+//state
 @immutable
 class FetchResult {
   final Iterable<Person> persons;
