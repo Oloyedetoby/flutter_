@@ -1,11 +1,19 @@
-import 'dart:convert';
-
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:bloc/bloc.dart';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:testingbloc_course/api/login_api.dart';
+import 'package:testingbloc_course/api/note_api.dart';
+import 'package:testingbloc_course/bloc/actions.dart';
 import 'dart:developer' as devtools show log;
+
+import 'package:testingbloc_course/bloc/app_bloc.dart';
+import 'package:testingbloc_course/bloc/app_state.dart';
+import 'package:testingbloc_course/dialogs/generic_dialogue.dart';
+import 'package:testingbloc_course/dialogs/loading_screen.dart';
+import 'package:testingbloc_course/models.dart';
+import 'package:testingbloc_course/strings.dart';
+import 'package:testingbloc_course/views/iterable_list_view.dart';
+import 'package:testingbloc_course/views/login_view.dart';
 
 extension Log on Object {
   void log() => devtools.log(toString());
@@ -25,112 +33,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: BlocProvider(
-        create: (_) => PersonBloc(),
-        child: const MyHomePage(),
-      ),
+      home: const MyHomePage(),
     );
   }
-}
-
-//event
-@immutable
-abstract class LoadAction {
-  const LoadAction();
-}
-
-@immutable
-class LoadPersonAction implements LoadAction {
-  final PersonUrl url;
-
-  const LoadPersonAction({required this.url}) : super();
-}
-
-enum PersonUrl {
-  persons1,
-  persons2,
-}
-
-extension UrlString on PersonUrl {
-  String get urlString {
-    switch (this) {
-      case PersonUrl.persons1:
-        return 'http://127.0.0.1:5500/api/persons1.json';
-      case PersonUrl.persons2:
-        return 'http://127.0.0.1:5500/api/persons2.json';
-    }
-  }
-}
-
-@immutable
-class Person {
-  final String name;
-  final int age;
-
-  const Person({
-    required this.name,
-    required this.age,
-  });
-  Person.fromjson(Map<String, dynamic> json)
-      : name = json['name'] as String,
-        age = json['age'] as int;
-
-  @override
-  String toString() => 'Person ( name = $name, age= $age)';
-}
-
-//to download the json from the server
-Future<Iterable<Person>> getPersons(String url) => HttpClient()
-    .getUrl(Uri.parse(url)) // this ask a request request
-    .then((req) => req.close()) // this gives a respond
-    .then((resp) => resp.transform(utf8.decoder).join()) // responnd to string
-    .then((str) =>
-        json.decode(str) as List<dynamic>) // tring goes into to become a  list
-    .then((list) => list.map((e) => Person.fromjson(
-        e))); // the ist becomes iterable of person and the result is future
-
-//state
-@immutable
-class FetchResult {
-  final Iterable<Person> persons;
-  final bool isRetrivedFromCache;
-
-  const FetchResult({required this.persons, required this.isRetrivedFromCache});
-  @override
-  String toString() =>
-      'FetchResult (isRetrievedFromCache = $isRetrivedFromCache, persons = $persons)';
-}
-
-class PersonBloc extends Bloc<LoadAction, FetchResult?> {
-  final Map<PersonUrl, Iterable<Person>> _cache = {};
-  PersonBloc() : super(null) {
-    on<LoadPersonAction>(
-      (event, emit) async {
-        final url = event.url;
-        if (_cache.containsKey(url)) {
-          //we have the value in the cache
-          final cachePersons = _cache[url]!;
-          final result = FetchResult(
-            persons: cachePersons,
-            isRetrivedFromCache: true,
-          );
-          emit(result);
-        } else {
-          final persons = await getPersons(url.urlString);
-          _cache[url] = persons;
-          final result = FetchResult(
-            persons: persons,
-            isRetrivedFromCache: false,
-          );
-          emit(result);
-        }
-      },
-    );
-  }
-}
-
-extension Subscript<T> on Iterable<T> {
-  T? operator [](int index) => length > index ? elementAt(index) : null;
 }
 
 class MyHomePage extends StatelessWidget {
@@ -138,59 +43,61 @@ class MyHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home Page'),
-      ),
-      body: Column(
-        children: [
-          Row(
-            children: [
-              TextButton(
-                onPressed: () {
-                  context.read<PersonBloc>().add(
-                        const LoadPersonAction(
-                          url: PersonUrl.persons1,
+    return BlocProvider(
+      create: (context) => AppBloc(loginApi: LoginApi(), noteApi: NoteApi()),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(homePage),
+        ),
+        body: BlocConsumer<AppBloc, AppState>(
+          builder: (context, appState) {
+            final notes = appState.fetchedNotes;
+            if (notes == null) {
+              return LoginView(
+                onLoginTapped: (email, password) {
+                  context.read<AppBloc>().add(
+                        LoginAction(
+                          password: password,
+                          email: email,
                         ),
                       );
                 },
-                child: const Text('Load json #1'),
-              ),
-              TextButton(
-                onPressed: () {
-                  context.read<PersonBloc>().add(
-                        const LoadPersonAction(
-                          url: PersonUrl.persons2,
-                        ),
-                      );
-                },
-                child: const Text('Load json #2'),
-              ),
-            ],
-          ),
-          BlocBuilder<PersonBloc, FetchResult?>(
-            buildWhen: (previousResult, currentResult) {
-              return previousResult?.persons != currentResult?.persons;
-            },
-            builder: ((context, fetchResult) {
-              fetchResult?.log();
-              final persons = fetchResult?.persons;
-              if (persons == null) {
-                return const SizedBox();
-              }
-              return Expanded(
-                child: ListView.builder(
-                    itemCount: persons.length,
-                    itemBuilder: (context, index) {
-                      final person = persons[index]!;
-                      return ListTile(
-                        title: Text(person.name),
-                      );
-                    }),
               );
-            }),
-          )
-        ],
+            } else {
+              return notes.toListView();
+            }
+          },
+          listener: (context, appState) {
+            //loading screen
+            if (appState.isLoading) {
+              LoadingScreen.instance().show(
+                context: context,
+                text: pleaseWait,
+              );
+            } else {
+              LoadingScreen.instance().hide();
+            }
+            //display possible error
+            final loginError = appState.loginError;
+            if (loginError != null) {
+              showGenericDialog<bool>(
+                context: context,
+                title: loginErrorDialogTitle,
+                content: loginErrorDilogContent,
+                optionsBuilder: () => {ok: true},
+              );
+            }
+            //if we are logged In , but we have  no fetched notes, fetch  them now
+            if (appState.isLoading == false &&
+                appState.loginError == null &&
+                appState.loginHandle == const LoginHandle.foobar() &&
+                appState.fetchedNotes == null) {
+              context.read<AppBloc>().add(
+                    const LoadNotesAction(),
+                  );
+            }
+          },
+        ),
       ),
     );
   }
